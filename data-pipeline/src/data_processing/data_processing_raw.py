@@ -85,6 +85,96 @@ def download_data_from_s3(s3, bucket_name):
             continue
     return datasets
 
+def transform_data(datasets):
+    processed = {}
+
+    # Processed customer data
+    if 'customer' in datasets: 
+        customer = datasets['customer'].copy()
+        # Clean email addresses
+        customer['email'] = customer['email'].str.lower().str.strip()
+
+        # Convert date 
+        customer['date_of_birth'] = pd.to_datetime(customer['date_of_birth'])
+        customer['registration_date'] = pd.to_datetime(customer['registration_date'])
+
+        # Calculate age
+        customer['age'] = (datetime.now() - customer['date_of_birth']).dt.days // 365 
+
+        # Create age groups 
+        customer['age_group'] = pd.cut(customer['age'], bins=[0,25,35,50,65,100], labels=['18-25','26-35','36-50','51-65','65+'])
+
+        processed['customer'] = customer 
+
+        print(f'Processed customer: {len(customer)} records')
+
+    # Processed product data
+    if 'product' in datasets:
+        product = datasets['product'].copy()
+        # Clean product names
+        product['product_name'] = product['product_name'].str.strip()
+
+        # Convert price to numeric 
+        product['price'] = pd.to_numeric(product['price'], errors = 'coerce')
+
+        # Create price categories  
+        product['price_category'] = pd.cut(product['price'], bins=[0,50,150,500,float('inf')], labels=['Budget','Mid-range','Premium','Luxury'])
+
+        processed['product_clean'] = product 
+
+        print(f'Processed product: {len(product)} records')
+
+    # Processed orders data 
+    if 'orders' in datasets:
+        orders = datasets['orders'].copy()
+        # Convert date 
+        orders['order_date'] = pd.to_datetime(orders['order_date'])
+
+        # Convert total amount to numeric
+        orders['total_amount'] = pd.to_numeric(orders['total_amount'], errors = 'coerce')
+
+        # Extract month and year for seasonal analysis
+        orders['order_month'] = orders['order_date'].dt.month
+        orders['order_year'] = orders['order_date'].dt.year
+
+        processed['orders_clean'] = orders 
+
+        print(f'Processed orders: {len(orders)} records')        
+
+     # Processed order item data
+    if 'order_items' in datasets:
+        order_items = datasets['order_items'].copy()
+
+        # Convert total amount to numeric
+        order_items['quantity'] = pd.to_numeric(order_items['quantity'], errors = 'coerce')
+        order_items['unit_price'] = pd.to_numeric(order_items['unit_price'], errors = 'coerce')
+
+        # Calculate total price per item
+        order_items['total_price'] = order_items['quantity'] * order_items['unit_price']
+
+        processed['order_items_clean'] = order_items
+
+        print(f'Processed order items: {len(order_items)} records')
+
+    # Processed reviews data 
+    if 'reviews' in datasets:
+        reviews = datasets['reviews'].copy()
+        # Convert date 
+        reviews['review_date'] = pd.to_datetime(reviews['review_date'])
+
+        # Convert rating to numeric
+        reviews['rating'] = pd.to_numeric(reviews['rating'], errors = 'coerce')
+
+        # Create rating categories
+        reviews['rating_category'] = reviews['rating'].apply(
+            lambda x: 'Excellent' if x >= 4.5 else 'Good' if x >= 3 else 'Average' if x >= 2.5 else 'Poor'
+        )
+
+        processed['reviews_clean'] = reviews
+
+        print(f'Processed reviews: {len(reviews)} records')
+
+    return processed
 
 if __name__ == "__main__":
     #TODO: Call process_ecommerce_data() and handle the results
